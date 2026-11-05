@@ -79,14 +79,18 @@ fun BoardView(
         pop.snapTo(0.55f)
         pop.animateTo(1f, tween(170, easing = FastOutSlowInEasing))
         popCell = null
-        // 2. waves at a steady tempo; very long chains ease slightly faster, never abruptly
+        // 2. waves at a steady tempo; long chains glide faster so the whole move stays short
         val last = res.waves.lastIndex
+        val durations = waveDurations(res.waves.size)
+        var lastPopAt = 0L
         res.waves.forEachIndexed { i, w ->
+            if (durations[i] == 0) { shown = pb.id to w.after; return@forEachIndexed }
             shown = pb.id to w.mid
-            Sounds.burst(i)
+            val now = System.currentTimeMillis()
+            if (now - lastPopAt >= 110) { Sounds.burst(i); lastPopAt = now } // no rapid-fire pops
             wave = w
             waveProgress.snapTo(0f)
-            val ms = (270 - (i - 8).coerceAtLeast(0) * 5).coerceAtLeast(190)
+            val ms = durations[i]
             waveProgress.animateTo(1f, tween(ms, easing = if (i == last) LinearOutSlowInEasing else LinearEasing))
             shown = pb.id to w.after
             wave = null
@@ -138,6 +142,35 @@ fun BoardView(
             }
             wave?.let { drawWave(it, current, waveProgress.value, cs) }
         }
+    }
+}
+
+/**
+ * Time per explosion wave (0 = apply instantly without animating).
+ * The first [CALM_WAVES] waves always play at the calm pace. After that the pace eases smoothly
+ * towards whatever fits the rest of the chain into [CHAIN_BUDGET_MS]; if even [FASTEST_MS] per
+ * wave is too slow, only every n-th wave is animated. So a 150+ wave end-game chain takes about
+ * six seconds instead of half a minute.
+ */
+private const val CALM_MS = 270
+private const val CALM_WAVES = 8
+private const val CHAIN_BUDGET_MS = 6000
+private const val FASTEST_MS = 40
+private const val RAMP_WAVES = 8
+
+internal fun waveDurations(n: Int): IntArray {
+    val rest = n - CALM_WAVES
+    if (rest <= 0) return IntArray(n) { CALM_MS }
+    val budget = CHAIN_BUDGET_MS - CALM_WAVES * CALM_MS - 1000 // ~1 s goes to the smooth ramp
+    val perWave = budget / rest
+    val target = perWave.coerceIn(FASTEST_MS, CALM_MS)
+    val stride = if (perWave >= FASTEST_MS) 1 else (FASTEST_MS * rest + budget - 1) / budget
+    return IntArray(n) { i ->
+        if (i < CALM_WAVES) return@IntArray CALM_MS
+        val j = i - CALM_WAVES
+        val ms = (target + (CALM_MS - target) * kotlin.math.exp(-j / 4.0)).toInt()
+        val animate = stride == 1 || j < RAMP_WAVES || j % stride == stride - 1 || i == n - 1
+        if (animate) ms else 0
     }
 }
 

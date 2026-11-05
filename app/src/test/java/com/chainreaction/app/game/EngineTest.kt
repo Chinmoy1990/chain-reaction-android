@@ -57,3 +57,15 @@ class EngineTest {
         assertTrue("game should end", s.winner >= 0)
     }
 }
+
+class WaveTimingTest {
+    @Test
+    fun longChainsStayShort() {
+        val short = com.chainreaction.app.ui.waveDurations(5)
+        assertTrue(short.all { it == 270 })
+        for (n in listOf(20, 60, 179, 400)) {
+            val total = com.chainreaction.app.ui.waveDurations(n).sum()
+            assertTrue("chain of $n waves took $total ms", total <= 7_000)
+        }
+    }
+}
