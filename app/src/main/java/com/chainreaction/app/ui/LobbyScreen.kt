@@ -3,6 +3,7 @@ package com.chainreaction.app.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
@@ -237,9 +238,9 @@ private fun JoinSection(adapter: BluetoothAdapter) {
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Join", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Join a friend's game", fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Ask your friend to tap \"Host a game\", then pick their phone:",
+            "Ask your friend to tap \"Host a game\", then tap their phone below:",
             fontSize = 13.sp, textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
         )
@@ -258,8 +259,21 @@ private fun JoinSection(adapter: BluetoothAdapter) {
             } else Text("Scan for nearby phones")
         }
         Spacer(Modifier.height(8.dp))
+        var showAll by remember { mutableStateOf(false) }
+        val all = paired + found
+        val phones = all.filter(::looksLikePhone)
+        val list = if (showAll) all else phones
+        val hidden = all.size - phones.size
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(paired + found, key = { it.address }) { d ->
+            if (list.isEmpty()) item {
+                Text(
+                    if (scanning) "Looking for phones…" else "No phones yet. Tap \"Scan for nearby phones\".",
+                    Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    textAlign = TextAlign.Center, fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                )
+            }
+            items(list, key = { it.address }) { d ->
                 val isPaired = paired.any { it.address == d.address }
                 Row(
                     Modifier
@@ -276,6 +290,18 @@ private fun JoinSection(adapter: BluetoothAdapter) {
                     )
                 }
             }
+            if (hidden > 0) item {
+                TextButton(onClick = { showAll = !showAll }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (showAll) "Show phones only" else "Show $hidden other devices (laptops, headphones…)")
+                }
+            }
         }
     }
 }
+
+/** Hide headphones, speakers, laptops etc. Devices that don't report a class are kept. */
+@SuppressLint("MissingPermission")
+private fun looksLikePhone(d: BluetoothDevice): Boolean = runCatching {
+    val major = d.bluetoothClass?.majorDeviceClass ?: return@runCatching true
+    major == BluetoothClass.Device.Major.PHONE || major == BluetoothClass.Device.Major.UNCATEGORIZED
+}.getOrDefault(true)

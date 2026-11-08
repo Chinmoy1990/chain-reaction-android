@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.chainreaction.app.ui.Bg
 import com.chainreaction.app.ui.ChainTheme
 import com.chainreaction.app.ui.GameScreen
 import com.chainreaction.app.ui.LobbyScreen
@@ -17,6 +20,8 @@ class MainActivity : ComponentActivity() {
         Sounds.init(applicationContext)
         setContent {
             ChainTheme {
+              // Surface supplies the default (light) text colour for every screen.
+              Surface(color = Bg, contentColor = MaterialTheme.colorScheme.onBackground) {
                 val vm: GameViewModel = viewModel()
                 when (vm.screen) {
                     Screen.MENU -> MenuScreen(vm)
@@ -30,6 +35,7 @@ class MainActivity : ComponentActivity() {
                     }
                     Screen.GAME -> GameScreen(vm)
                 }
+              }
             }
         }
     }
